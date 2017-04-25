@@ -1,0 +1,18 @@
+# This template derives an OpenSUSE Leap image compatible
+# with Juju, adding cloud-init and naming it according to
+# Juju's LXD image name convention.
+base: images:opensuse/42.2
+alias: juju/opensuseleap/amd64
+commands:
+  - zypper --gpg-auto-import-keys --non-interactive install cloud-init
+  - sed -i -E 's/.*(set|update)_hostname.*/#\\0/' /etc/cloud/cloud.cfg
+  - zypper clean --all
+  - rm -f /etc/ssh/*key*
+  - systemctl unmask sshd.service
+  - systemctl enable sshd.service
+  - systemctl unmask cloud-init.service
+  - systemctl enable cloud-init.service
+  - systemctl unmask cloud-config.service
+  - systemctl enable cloud-config.service
+  - systemctl unmask cloud-final.service
+  - systemctl enable cloud-final.service

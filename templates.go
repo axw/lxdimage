@@ -19,6 +19,21 @@ config:
 	cloudInitVendorTemplate = `{{ config_get("user.vendor-data", properties.default) }}`
 )
 
+// Template describes a LXD image template.
+type Template struct {
+	Properties map[string]string `yaml:"properties,omitempty"`
+	Template   string            `yaml:"template"`
+	When       []string          `yaml:"when,omitempty"`
+
+	// Path is the path of the file on disk that the template
+	// creates.
+	Path string `yaml:"-"`
+
+	// Content is the contents of the template file to create
+	// in the image metadata.
+	Content string `yaml:"-"`
+}
+
 // CloudInitTemplates contains a set of templates that can be used
 // to create cloud-init metadata files.
 var CloudInitTemplates = []Template{{

@@ -21,45 +21,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Template describes a LXD image template.
-type Template struct {
-	Properties map[string]string `yaml:"properties,omitempty"`
-	Template   string            `yaml:"template"`
-	When       []string          `yaml:"when,omitempty"`
-
-	// Path is the path of the file on disk that the template
-	// creates.
-	Path string `yaml:"-"`
-
-	// Content is the contents of the template file to create
-	// in the image metadata.
-	Content string `yaml:"-"`
-}
-
 // Builder builds LXD images.
 type Builder struct {
-	BaseImage string
-	Alias     string
-	Templates []Template
-	Commands  []string
-	Log       *log.Logger
-}
-
-func (b *Builder) validateConfig() error {
-	if b.BaseImage == "" {
-		return errors.New("BaseImage must be set")
-	}
-	if b.Alias == "" {
-		return errors.New("Alias must be set")
-	}
-	// TODO(axw) validate templates
-	return nil
+	Log *log.Logger
 }
 
 // Build builds a LXD image, importing it into LXD with the configured alias.
-func (b *Builder) Build() error {
-	if err := b.validateConfig(); err != nil {
-		return fmt.Errorf("validating config: %v", err)
+func (b *Builder) Build(spec Spec) error {
+	if err := spec.Validate(); err != nil {
+		return fmt.Errorf("validating image spec: %v", err)
 	}
 
 	logger := b.Log
@@ -73,7 +43,7 @@ func (b *Builder) Build() error {
 	if err != nil {
 		return err
 	}
-	if err := ctx.lxc("launch", b.BaseImage, containerName); err != nil {
+	if err := ctx.lxc("launch", spec.BaseImage, containerName); err != nil {
 		return err
 	}
 	var deleted bool
@@ -92,13 +62,13 @@ func (b *Builder) Build() error {
 
 	// Update the build container by running commands inside it,
 	// and then publish the container as an image.
-	if err := ctx.runCommands(containerName, b.Commands); err != nil {
+	if err := ctx.runCommands(containerName, spec.Commands); err != nil {
 		return err
 	}
 	if err := ctx.lxc("stop", containerName); err != nil {
 		return err
 	}
-	if err := ctx.lxc("publish", "--alias="+b.Alias, containerName); err != nil {
+	if err := ctx.lxc("publish", "--alias="+spec.Alias, containerName); err != nil {
 		return err
 	}
 	if err := ctx.lxc("delete", containerName); err != nil {
@@ -107,8 +77,8 @@ func (b *Builder) Build() error {
 	deleted = true
 
 	// Export the image and add the cloud-init templates.
-	if len(b.Templates) > 0 {
-		if err := ctx.updateImageTemplates(b.Alias, b.Templates); err != nil {
+	if len(spec.Templates) > 0 {
+		if err := ctx.updateImageTemplates(spec.Alias, spec.Templates); err != nil {
 			return err
 		}
 	}
