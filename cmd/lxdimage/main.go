@@ -5,6 +5,8 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/fatih/color"
@@ -26,29 +28,45 @@ func main() {
 	}
 	for _, arg := range args {
 		log.Println("processing:", arg)
-		if err := processFile(arg); err != nil {
+		if err := processArg(arg); err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func processFile(f string) error {
-	data, err := ioutil.ReadFile(f)
+func processArg(arg string) error {
+	data, err := fetch(arg)
 	if err != nil {
 		return err
 	}
 	var spec lxdimage.Spec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	color.Set(defaultColor)
 	b := lxdimage.Builder{
 		Log: log.New(colorWriter{os.Stderr}, "["+spec.Alias+"] ", log.LstdFlags),
 	}
 	if err := b.Build(spec); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	return nil
+}
+
+func fetch(arg string) ([]byte, error) {
+	url, err := url.Parse(arg)
+	if err != nil || url.Scheme == "" {
+		return ioutil.ReadFile(arg)
+	}
+	if url.Scheme == "file" {
+		return ioutil.ReadFile(url.Path)
+	}
+	resp, err := http.Get(arg)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
 }
 
 type colorWriter struct {
